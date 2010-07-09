@@ -11,8 +11,14 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp\
-        widget.cpp
+        widget.cpp \
+    patch.cpp \
+    thread.cpp \
+    progressbar.cpp
 
-HEADERS  += widget.h
+HEADERS  += widget.h \
+    patch.h \
+    thread.h \
+    progressbar.h
 
 FORMS    += widget.ui
