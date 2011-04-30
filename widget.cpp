@@ -78,11 +78,13 @@ void Widget::appendPatches()
             Patch *patch = new Patch(file);
             _patches.append(patch);
 
-            QListWidgetItem *item = new QListWidgetItem(QIcon(QPixmap::fromImage(*patch)),
+			QListWidgetItem *item = new QListWidgetItem(/*QIcon(QPixmap::fromImage(*patch)),*/
                                                         QFileInfo(file).baseName());
             ui->listWidget->addItem(item);
 
             _averagePatches[i % _averagePatches.size()]->addPatch(patch);
+
+//			qDebug("add patch...");
         }
 
         ui->progressBar->setMaximum(fileNames.size());

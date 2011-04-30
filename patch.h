@@ -4,13 +4,12 @@
 #include <QImage>
 #include <QColor>
 
-class Patch : public QImage
+class Patch
 {
 public:
-    Patch(const QString &fileName, const char *format = 0);
-    Patch(const char *fileName, const char *format = 0);
-    Patch(const QImage &image, QRgb avg = 0);
-    Patch(const Patch &copy);
+	Patch(const QString &fileName);
+
+	void create();
 
     QRgb average() const;
     void averaging();
@@ -20,6 +19,9 @@ public:
 private:
     QRgb _average;
 
+	QString _filename;
+
+	QImage _original;
     QImage _temporary;
 };
 
