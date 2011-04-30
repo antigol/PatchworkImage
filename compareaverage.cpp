@@ -1,13 +1,21 @@
 #include "compareaverage.h"
 
-CompareAverage::CompareAverage(const QImage &workScaledMini, const QList<Patch *> &patches, int beg, int end, ScaleAndPaste *sap, QObject *parent) :
-    QThread(parent), _work(workScaledMini), _patches(patches), _beg(beg), _end(end), _sap(sap)
+CompareAverage::CompareAverage(const QImage &workScaledMini, const QList<Patch *> &patches, int beg, int end, QSize patchSize, ScaleAndPaste *sap, QObject *parent) :
+    QThread(parent), _work(workScaledMini), _patches(patches), _beg(beg), _end(end), _patchSize(patchSize), _sap(sap)
 {
+}
+
+CompareAverage::~CompareAverage()
+{
+    _stop = true;
+    wait();
 }
 
 void CompareAverage::run()
 {
-    for (int i = _beg; i < _end; ++i) {
+    _stop = false;
+
+    for (int i = _beg; i < _end && !_stop; ++i) {
         const int x = i % _work.width();
         const int y = i / _work.width();
 
@@ -32,6 +40,7 @@ void CompareAverage::run()
             }
         }
 
+        _patches[id]->scaled(_patchSize);
         _sap->paste(id, QPoint(x, y));
     }
 }

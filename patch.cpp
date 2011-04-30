@@ -1,13 +1,13 @@
 #include "patch.h"
 
 Patch::Patch(const QString &fileName) :
-	_filename(fileName)
+    _filename(fileName)
 {
 }
 
 void Patch::create()
 {
-	_original.load(_filename);
+    _average = QImage(_filename).scaled(1, 1, Qt::IgnoreAspectRatio, Qt::SmoothTransformation).pixel(0, 0);
 }
 
 QRgb Patch::average() const
@@ -15,15 +15,15 @@ QRgb Patch::average() const
     return _average;
 }
 
-void Patch::averaging()
+const QImage &Patch::scaled(const QSize &s)
 {
-	_average = _original.scaled(1, 1, Qt::IgnoreAspectRatio, Qt::SmoothTransformation).pixel(0, 0);
-}
-
-QImage Patch::scaled(const QSize &s)
-{
+    _mx.lock();
     if (_temporary.size() != s) {
-		_temporary = _original.scaled(s, Qt::KeepAspectRatioByExpanding);
+        _temporary = QImage(_filename).scaled(s, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+        int x = (_temporary.width() - s.width()) / 2;
+        int y = (_temporary.height() - s.height()) / 2;
+        _temporary = _temporary.copy(x, y, s.width(), s.height());
     }
+    _mx.unlock();
     return _temporary;
 }

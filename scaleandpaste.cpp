@@ -31,7 +31,7 @@ void ScaleAndPaste::run()
     _stop = false;
 
     while (paste < total && !_stop) {
-        while (!_todo.isEmpty()) {
+        while (!_todo.isEmpty() && !_stop) {
             _mx.lock();
             job = _todo.takeLast();
             _mx.unlock();
@@ -41,7 +41,7 @@ void ScaleAndPaste::run()
 
             ++paste;
             emit progress(paste);
-            qDebug("(%d/%d)", paste, total);
+//            qDebug("(%d/%d)", paste, total);
         }
         msleep(20);
     }

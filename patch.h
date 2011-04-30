@@ -3,26 +3,27 @@
 
 #include <QImage>
 #include <QColor>
+#include <QMutex>
 
 class Patch
 {
 public:
-	Patch(const QString &fileName);
+    Patch(const QString &fileName);
 
-	void create();
+    void create();
 
     QRgb average() const;
-    void averaging();
 
-    QImage scaled(const QSize &s);
+    const QImage &scaled(const QSize &s);
 
 private:
     QRgb _average;
 
-	QString _filename;
+    QString _filename;
 
-	QImage _original;
     QImage _temporary;
+
+    QMutex _mx;
 };
 
 #endif // PATCH_H

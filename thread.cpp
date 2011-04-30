@@ -19,8 +19,7 @@ void Thread::run()
 {
     while (!_patches.isEmpty()) {
         Patch *p = _patches.takeFirst();
-		p->create();
-        p->averaging();
+        p->create();
         emit onemore(1);
     }
     emit finished(true);

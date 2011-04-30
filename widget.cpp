@@ -16,6 +16,7 @@ Widget::Widget(QWidget *parent) :
     for (int i = 0; i < cpucount(); ++i) {
         _averagePatches.append(new Thread(this));
         connect(_averagePatches.last(), SIGNAL(onemore(int)), ui->progressBar, SLOT(increment(int)));
+        connect(_averagePatches.last(), SIGNAL(finished()), this, SLOT(averageFinished()));
     }
 
     connect(ui->pushButton_append, SIGNAL(clicked()), this, SLOT(appendPatches()));
@@ -29,8 +30,9 @@ Widget::~Widget()
 {
     saveSettings();
 
-    for (int i = 0; i < _averagePatches.size(); ++i)
+    for (int i = 0; i < _averagePatches.size(); ++i) {
         _averagePatches[i]->wait();
+    }
 
     if (_scaleAndPaste != 0) {
         _scaleAndPaste->stop();
@@ -78,22 +80,34 @@ void Widget::appendPatches()
             Patch *patch = new Patch(file);
             _patches.append(patch);
 
-			QListWidgetItem *item = new QListWidgetItem(/*QIcon(QPixmap::fromImage(*patch)),*/
+            QListWidgetItem *item = new QListWidgetItem(/*QIcon(QPixmap::fromImage(*patch)),*/
                                                         QFileInfo(file).baseName());
             ui->listWidget->addItem(item);
 
             _averagePatches[i % _averagePatches.size()]->addPatch(patch);
 
-//			qDebug("add patch...");
+            // qDebug("add patch...");
         }
 
         ui->progressBar->setMaximum(fileNames.size());
         ui->progressBar->setValue(1);
 
+        ui->pushButton_append->setEnabled(false);
+        ui->pushButton_patch->setEnabled(false);
         for (int i = 0; i < _averagePatches.size(); ++i) {
             _averagePatches[i]->start();
         }
     }
+}
+
+void Widget::averageFinished()
+{
+    for (int i = 0; i < _averagePatches.size(); ++i) {
+        if (_averagePatches[i]->isRunning())
+            return;
+    }
+    ui->pushButton_append->setEnabled(true);
+    ui->pushButton_patch->setEnabled(true);
 }
 
 void Widget::loadImage()
@@ -103,7 +117,7 @@ void Widget::loadImage()
     if (!file.isEmpty()) {
         if (workingImage.load(file)) {
             QSettings().setValue("image_path", file);
-            ui->label_image->setPixmap(QPixmap::fromImage(workingImage));
+            ui->label_image->setPixmap(QPixmap::fromImage(workingImage).scaled(ui->label_image->geometry().size(), Qt::KeepAspectRatio));
         }
     }
 }
@@ -131,10 +145,12 @@ void Widget::patch()
 
     const QImage miniwork = workingImage.scaled(workSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     ui->label_image->setPixmap(QPixmap::fromImage(miniwork));
-    const int part = works / cpucount();
 
-    for (int i = 0; i < cpucount(); ++i) {
-        CompareAverage *captr = new CompareAverage(miniwork, _patches, i * part, (i + 1 == cpucount()) ? (works) : ((i + 1) * part), _scaleAndPaste, this);
+    const int compareThreads = qMax(1, cpucount() - 1);
+    const int part = works / compareThreads;
+
+    for (int i = 0; i < compareThreads; ++i) {
+        CompareAverage *captr = new CompareAverage(miniwork, _patches, i * part, (i + 1 == compareThreads) ? (works) : ((i + 1) * part), patchSize, _scaleAndPaste, this);
         //connect(captr, SIGNAL(toPaste(int,QPoint)), _scaleAndPaste, SLOT(paste(int,QPoint)));
 
         captr->start();
@@ -146,9 +162,18 @@ void Widget::patch()
 
 void Widget::patchfinished()
 {
-    qDebug("finished");
-    ui->label_image->setPixmap(QPixmap::fromImage(_scaleAndPaste->finalImage()));
+//    qDebug("finished");
+    ui->label_image->setPixmap(QPixmap::fromImage(_scaleAndPaste->finalImage()).scaled(ui->label_image->geometry().size(), Qt::KeepAspectRatio));
+    //ui->listWidget->clear();
     ui->pushButton_patch->setEnabled(true);
+
+    QString file = QFileDialog::getSaveFileName(this, tr("Working image"), QSettings().value("image_save", QDir::homePath()).toString(), "Images (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm *.tiff *.xbm *.xpm)");
+
+    if (!file.isEmpty()) {
+        QSettings().setValue("image_save", file);
+        if (!_scaleAndPaste->finalImage().save(file))
+            QMessageBox::critical(this, tr("Saving error"), tr("Cannot save the file"));
+    }
 
     for (int i = 0; i < _compareAverages.size(); ++i) {
         _compareAverages.first()->wait();

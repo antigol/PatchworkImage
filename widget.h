@@ -30,6 +30,7 @@ private slots:
     void loadImage();
     void patch();
     void patchfinished();
+    void averageFinished();
 
 private:
     void loadSettings();
