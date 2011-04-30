@@ -4,33 +4,62 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QFileInfo>
+#include <QSettings>
 
 Widget::Widget(QWidget *parent) :
-        QWidget(parent),
-        ui(new Ui::Widget)
+    QWidget(parent),
+    ui(new Ui::Widget),
+    _scaleAndPaste(0)
 {
     ui->setupUi(this);
 
-    for (int i = 0; i < 2; ++i) {
-        _threads.append(new Thread(this));
-        connect(_threads.last(), SIGNAL(onemore(int)), ui->progressBar, SLOT(increment(int)));
+    for (int i = 0; i < cpucount(); ++i) {
+        _averagePatches.append(new Thread(this));
+        connect(_averagePatches.last(), SIGNAL(onemore(int)), ui->progressBar, SLOT(increment(int)));
     }
 
     connect(ui->pushButton_append, SIGNAL(clicked()), this, SLOT(appendPatches()));
     connect(ui->pushButton_load, SIGNAL(clicked()), this, SLOT(loadImage()));
+    connect(ui->pushButton_patch, SIGNAL(clicked()), this, SLOT(patch()));
+
+    loadSettings();
 }
 
 Widget::~Widget()
 {
-    for (int i = 0; i < 2; ++i)
-        _threads[i]->wait();
+    saveSettings();
+
+    for (int i = 0; i < _averagePatches.size(); ++i)
+        _averagePatches[i]->wait();
+
+    if (_scaleAndPaste != 0) {
+        _scaleAndPaste->stop();
+        _scaleAndPaste->wait();
+    }
 
     delete ui;
+}
+
+void Widget::loadSettings()
+{
+    QSettings settings;
+    ui->spinBox_width->setValue(settings.value("width_of_patch", 32).toInt());
+    ui->spinBox_height->setValue(settings.value("height_of_patch", 32).toInt());
+    ui->doubleSpinBox_scale->setValue(settings.value("scale_value", 1.0).toDouble());
+}
+
+void Widget::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("width_of_patch", ui->spinBox_width->value());
+    settings.setValue("height_of_patch", ui->spinBox_height->value());
+    settings.setValue("scale_value", ui->doubleSpinBox_scale->value());
 }
 
 void Widget::appendPatches()
 {
     QFileDialog fileDialog(this, tr("Patches"));
+    fileDialog.setDirectory(QSettings().value("patches_directory", QDir::homePath()).toString());
     fileDialog.setFilter("Images (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm *.tiff *.xbm *.xpm)");
     fileDialog.setAcceptMode(QFileDialog::AcceptOpen);
     fileDialog.setFileMode(QFileDialog::ExistingFiles);
@@ -38,6 +67,8 @@ void Widget::appendPatches()
 
     if (fileDialog.exec() == QDialog::Accepted) {
         ui->progressBar->setMaximum(0);
+
+        QSettings().setValue("patches_directory", fileDialog.directory().path());
 
         QStringList fileNames = fileDialog.selectedFiles();
 
@@ -51,49 +82,78 @@ void Widget::appendPatches()
                                                         QFileInfo(file).baseName());
             ui->listWidget->addItem(item);
 
-            _threads[i % _threads.size()]->addPatch(patch);
+            _averagePatches[i % _averagePatches.size()]->addPatch(patch);
         }
 
         ui->progressBar->setMaximum(fileNames.size());
+        ui->progressBar->setValue(1);
 
-        for (int i = 0; i < _threads.size(); ++i) {
-            _threads[i]->start();
+        for (int i = 0; i < _averagePatches.size(); ++i) {
+            _averagePatches[i]->start();
         }
     }
 }
 
 void Widget::loadImage()
 {
-    QString file = QFileDialog::getOpenFileName(this, tr("Working image"), QString(), "Images (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm *.tiff *.xbm *.xpm)");
+    QString file = QFileDialog::getOpenFileName(this, tr("Working image"), QSettings().value("image_path", QDir::homePath()).toString(), "Images (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm *.tiff *.xbm *.xpm)");
 
     if (!file.isEmpty()) {
-        workingImage.load(file);
-        ui->label_image->setPixmap(QPixmap::fromImage(workingImage));
+        if (workingImage.load(file)) {
+            QSettings().setValue("image_path", file);
+            ui->label_image->setPixmap(QPixmap::fromImage(workingImage));
+        }
     }
 }
 
 void Widget::patch()
 {
-    QList<QImage> scaledPatches;
+    if (_scaleAndPaste != 0)
+        return;
 
-    int pWidth = ui->spinBox_width->value();
-    int pHeight = ui->spinBox_height->value();
+    const QSize patchSize(ui->spinBox_width->value(), ui->spinBox_height->value());
+    const QSize workSize((workingImage.width() * ui->doubleSpinBox_scale->value()) / patchSize.width(),
+                         (workingImage.height() * ui->doubleSpinBox_scale->value()) / patchSize.height());
+    const int works = workSize.width() * workSize.height();
 
-    for (int i = 0; i < _patches.size(); ++i) {
-        scaledPatches.append(_patches[i]->scaled(pWidth, pHeight, Qt::KeepAspectRatioByExpanding));
+    if (patchSize.isNull() || workSize.isNull())
+        return;
+
+    ui->progressBar->setMaximum(works);
+    ui->pushButton_patch->setDisabled(true);
+
+    _scaleAndPaste = new ScaleAndPaste(_patches, workSize, patchSize, this);
+
+    connect(_scaleAndPaste, SIGNAL(finished()), this, SLOT(patchfinished()));
+    connect(_scaleAndPaste, SIGNAL(progress(int)), ui->progressBar, SLOT(setValue(int)));
+
+    const QImage miniwork = workingImage.scaled(workSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    ui->label_image->setPixmap(QPixmap::fromImage(miniwork));
+    const int part = works / cpucount();
+
+    for (int i = 0; i < cpucount(); ++i) {
+        CompareAverage *captr = new CompareAverage(miniwork, _patches, i * part, (i + 1 == cpucount()) ? (works) : ((i + 1) * part), _scaleAndPaste, this);
+        //connect(captr, SIGNAL(toPaste(int,QPoint)), _scaleAndPaste, SLOT(paste(int,QPoint)));
+
+        captr->start();
+        _compareAverages.append(captr);
     }
 
-    QImage result = workingImage.scaled(workingImage.size() * ui->doubleSpinBox_scale->value());
-
-    for (int x = 0; x < result.width(); x += pWidth) {
-        for (int y = 0; y < result.height(); x += pHeight) {
-
-        }
-    }
+    _scaleAndPaste->start();
 }
 
+void Widget::patchfinished()
+{
+    qDebug("finished");
+    ui->label_image->setPixmap(QPixmap::fromImage(_scaleAndPaste->finalImage()));
+    ui->pushButton_patch->setEnabled(true);
 
-
+    for (int i = 0; i < _compareAverages.size(); ++i) {
+        _compareAverages.first()->wait();
+        delete _compareAverages.takeFirst();
+    }
+    delete _scaleAndPaste; _scaleAndPaste = 0;
+}
 
 void Widget::changeEvent(QEvent *e)
 {
@@ -105,4 +165,9 @@ void Widget::changeEvent(QEvent *e)
     default:
         break;
     }
+}
+
+int cpucount()
+{
+    return QThread::idealThreadCount();
 }

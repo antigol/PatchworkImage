@@ -3,6 +3,8 @@
 
 #include "patch.h"
 #include "thread.h"
+#include "scaleandpaste.h"
+#include "compareaverage.h"
 
 #include <QWidget>
 
@@ -27,12 +29,22 @@ private slots:
     void appendPatches();
     void loadImage();
     void patch();
+    void patchfinished();
 
 private:
+    void loadSettings();
+    void saveSettings();
+
     Ui::Widget *ui;
     QImage workingImage;
     QList<Patch *> _patches;
-    QList<Thread *> _threads;
+
+    QList<Thread *> _averagePatches;
+
+    ScaleAndPaste *_scaleAndPaste;
+    QList<CompareAverage *> _compareAverages;
 };
+
+int cpucount();
 
 #endif // WIDGET_H

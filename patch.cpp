@@ -1,43 +1,40 @@
 #include "patch.h"
 
 Patch::Patch(const QString &fileName, const char *format) :
-        QImage(fileName, format)
+    QImage(fileName, format)
 {
 }
 
 Patch::Patch(const char *fileName, const char *format) :
-        QImage(fileName, format)
+    QImage(fileName, format)
 {
 }
 
-Patch::Patch(const QImage &image) :
-        QImage(image)
+Patch::Patch(const QImage &image, QRgb avg) :
+    QImage(image), _average(avg)
 {
 }
 
-const QColor &Patch::average() const
+Patch::Patch(const Patch &copy) :
+    QImage(copy), _average(copy._average)
+{
+
+}
+
+QRgb Patch::average() const
 {
     return _average;
 }
 
 void Patch::averaging()
 {
-    QRgb p;
-    uint r = 0, g = 0, b = 0;
+    _average = QImage::scaled(1, 1, Qt::IgnoreAspectRatio, Qt::SmoothTransformation).pixel(0, 0);
+}
 
-    for (int x = 0; x < width(); ++x)
-        for (int y = 0; y < height(); ++y) {
-        p = pixel(x, y);
-        r += qRed(p);
-        g += qGreen(p);
-        b += qBlue(p);
+QImage Patch::scaled(const QSize &s)
+{
+    if (_temporary.size() != s) {
+        _temporary = QImage::scaled(s, Qt::KeepAspectRatioByExpanding);
     }
-
-    uint size = width() * height();
-
-    r /= size;
-    g /= size;
-    b /= size;
-
-    _average.setRgb(r, g, b);
+    return _temporary;
 }

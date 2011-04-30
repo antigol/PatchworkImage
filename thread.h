@@ -16,6 +16,7 @@ public:
 
 signals:
     void onemore(int);
+    void finished(bool);
 
 public slots:
 

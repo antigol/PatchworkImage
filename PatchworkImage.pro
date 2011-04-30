@@ -14,11 +14,15 @@ SOURCES += main.cpp\
         widget.cpp \
     patch.cpp \
     thread.cpp \
-    progressbar.cpp
+    progressbar.cpp \
+    scaleandpaste.cpp \
+    compareaverage.cpp
 
 HEADERS  += widget.h \
     patch.h \
     thread.h \
-    progressbar.h
+    progressbar.h \
+    scaleandpaste.h \
+    compareaverage.h
 
 FORMS    += widget.ui

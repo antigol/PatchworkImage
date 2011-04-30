@@ -9,15 +9,18 @@ class Patch : public QImage
 public:
     Patch(const QString &fileName, const char *format = 0);
     Patch(const char *fileName, const char *format = 0);
-    Patch(const QImage &image);
+    Patch(const QImage &image, QRgb avg = 0);
+    Patch(const Patch &copy);
 
-    const QColor &average() const;
-
-public:
+    QRgb average() const;
     void averaging();
 
+    QImage scaled(const QSize &s);
+
 private:
-    QColor _average;
+    QRgb _average;
+
+    QImage _temporary;
 };
 
 #endif // PATCH_H

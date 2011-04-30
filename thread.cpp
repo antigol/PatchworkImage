@@ -22,4 +22,5 @@ void Thread::run()
         p->averaging();
         emit onemore(1);
     }
+    emit finished(true);
 }
