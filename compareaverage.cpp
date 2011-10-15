@@ -20,10 +20,11 @@ void CompareAverage::run()
         const int y = i / _work.width();
 
         const QRgb a = _work.pixel(x, y);
-        const int ar = qRed(a);
-        const int ag = qGreen(a);
-        const int ab = qBlue(a);
-        const int agray = qGray(a);
+        const int aa = qAlpha(a);
+        const int ar = (aa == 0) ? 255 : qRed(a);
+        const int ag = (aa == 0) ? 255 : qGreen(a);
+        const int ab = (aa == 0) ? 255 : qBlue(a);
+        const int agray = (aa == 0) ? 255 : qGray(a);
 
         int min = 1000;
         int id = -1;
